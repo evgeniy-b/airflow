@@ -458,6 +458,12 @@ class BeamRunPythonPipelineOperator(BeamBasePipelineOperator):
             process_line_callback=self.process_line_callback,
             is_dataflow_job_id_exist_callback=self.is_dataflow_job_id_exist_callback,
         )
+        if not self.dataflow_job_id and self.dataflow_job_name:
+            self.dataflow_job_id = self.dataflow_hook.fetch_job_id_by_name(
+                name=self.dataflow_job_name,
+                project_id=self.dataflow_config.project_id,
+                location=self.dataflow_config.location,
+            )
 
         location = self.dataflow_config.location or DEFAULT_DATAFLOW_LOCATION
         DataflowJobLink.persist(
@@ -654,6 +660,12 @@ class BeamRunJavaPipelineOperator(BeamBasePipelineOperator):
                 process_line_callback=self.process_line_callback,
                 is_dataflow_job_id_exist_callback=self.is_dataflow_job_id_exist_callback,
             )
+            if not self.dataflow_job_id and self.dataflow_job_name:
+                self.dataflow_job_id = self.dataflow_hook.fetch_job_id_by_name(
+                    name=self.dataflow_job_name,
+                    project_id=self.dataflow_config.project_id,
+                    location=self.dataflow_config.location,
+                )
             if self.dataflow_job_name and self.dataflow_config.location:
                 DataflowJobLink.persist(
                     context=context,

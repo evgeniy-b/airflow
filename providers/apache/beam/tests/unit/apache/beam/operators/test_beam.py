@@ -217,6 +217,7 @@ class TestBeamRunPythonPipelineOperator:
         start_python_dataflow.
         """
         gcs_provide_file = gcs_hook.return_value.provide_file
+        dataflow_hook_mock.return_value.fetch_job_id_by_name.return_value = None
         op = BeamRunPythonPipelineOperator(
             dataflow_config={"impersonation_chain": TEST_IMPERSONATION_ACCOUNT},
             runner="DataflowRunner",
@@ -280,6 +281,31 @@ class TestBeamRunPythonPipelineOperator:
         dataflow_hook_mock.return_value.is_job_dataflow_running.return_value = False
         op.execute({})
         assert op.dataflow_config.job_name == op.task_id
+
+    @mock.patch(BEAM_OPERATOR_PATH.format("DataflowJobLink.persist"))
+    @mock.patch(BEAM_OPERATOR_PATH.format("BeamHook"))
+    @mock.patch(BEAM_OPERATOR_PATH.format("DataflowHook"))
+    @mock.patch(BEAM_OPERATOR_PATH.format("GCSHook"))
+    def test_exec_dataflow_runner__resolves_job_id_by_name_when_stdout_misses(
+        self, gcs_hook, dataflow_hook_mock, beam_hook_mock, persist_link_mock
+    ):
+        """When stdout scrape misses, fall back to DataflowHook.fetch_job_id_by_name."""
+        resolved_id = "2026-05-28_07_15_42-1234567890"
+        dataflow_hook_mock.return_value.fetch_job_id_by_name.return_value = resolved_id
+        op = BeamRunPythonPipelineOperator(
+            dataflow_config={"impersonation_chain": TEST_IMPERSONATION_ACCOUNT},
+            runner="DataflowRunner",
+            **self.default_op_kwargs,
+        )
+
+        op.execute({})
+
+        dataflow_hook_mock.return_value.fetch_job_id_by_name.assert_called_once_with(
+            name=op.dataflow_job_name,
+            project_id=op.dataflow_config.project_id,
+            location=op.dataflow_config.location,
+        )
+        assert op.dataflow_job_id == resolved_id
 
     @mock.patch(BEAM_OPERATOR_PATH.format("DataflowJobLink.persist"))
     @mock.patch(BEAM_OPERATOR_PATH.format("BeamHook"))
@@ -451,6 +477,7 @@ class TestBeamRunJavaPipelineOperator:
         )
         gcs_provide_file = gcs_hook.return_value.provide_file
         dataflow_hook_mock.return_value.is_job_dataflow_running.return_value = False
+        dataflow_hook_mock.return_value.fetch_job_id_by_name.return_value = None
 
         op.execute({})
 
@@ -1049,6 +1076,7 @@ class TestBeamRunPythonPipelineOperatorAsync:
     @mock.patch(BEAM_OPERATOR_PATH.format("GCSHook"))
     def test_on_kill_direct_runner(self, _, dataflow_mock, __):
         dataflow_cancel_job = dataflow_mock.return_value.cancel_job
+        dataflow_mock.return_value.fetch_job_id_by_name.return_value = None
         op = BeamRunPythonPipelineOperator(runner="DataflowRunner", **self.default_op_kwargs)
         if AIRFLOW_V_3_0_PLUS:
             with pytest.raises(TaskDeferred):
